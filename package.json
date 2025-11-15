@@ -1,0 +1,21 @@
+{
+  "name": "partypilot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PartyPilot monorepo",
+  "packageManager": "pnpm@10.20.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:api": "pnpm --filter api dev",
+    "build:api": "pnpm --filter api build",
+    "start:api": "pnpm --filter api start",
+    "prisma:migrate": "pnpm --filter api prisma:migrate",
+    "prisma:generate": "pnpm --filter api prisma:generate",
+    "prisma:seed": "pnpm --filter api prisma:seed"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  }
+}

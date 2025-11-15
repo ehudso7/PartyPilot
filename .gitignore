@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Environment
+.env
+apps/api/.env
+*.local
+
+# Prisma
+/apps/api/prisma/migrations/*/steps.json
+
+# Misc
+.DS_Store
+.vscode/
+.idea/
