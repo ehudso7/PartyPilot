@@ -1,0 +1,57 @@
+{
+  "version": "1.0",
+  "tripSchema": {
+    "type": "object",
+    "required": ["title", "city", "dateStart", "dateEnd", "groupSizeMin", "groupSizeMax", "occasion", "budgetLevel", "events"],
+    "properties": {
+      "title": { "type": "string" },
+      "city": { "type": "string" },
+      "dateStart": { "type": "string", "format": "date-time" },
+      "dateEnd": { "type": "string", "format": "date-time" },
+      "groupSizeMin": { "type": "integer" },
+      "groupSizeMax": { "type": "integer" },
+      "occasion": { "type": "string" },
+      "budgetLevel": { "type": "string" },
+      "events": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["orderIndex", "type", "label", "timeWindow", "primaryVenueRequirements"],
+          "properties": {
+            "orderIndex": { "type": "integer" },
+            "type": { "type": "string" },
+            "label": { "type": "string" },
+            "timeWindow": {
+              "type": "object",
+              "required": ["start", "end"],
+              "properties": {
+                "start": { "type": "string", "format": "date-time" },
+                "end": { "type": "string", "format": "date-time" }
+              }
+            },
+            "primaryVenueRequirements": {
+              "type": "object",
+              "properties": {
+                "tags": { "type": "array", "items": { "type": "string" } },
+                "area": { "type": "string" },
+                "groupFriendly": { "type": "boolean" },
+                "dressCode": { "type": "string" },
+                "priceLevel": { "type": "string" }
+              }
+            },
+            "backupVenueRequirements": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "tags": { "type": "array", "items": { "type": "string" } },
+                  "area": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
