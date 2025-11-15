@@ -1,0 +1,22 @@
+{
+  "name": "partypilot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Natural-language event planning and booking system",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "pnpm --filter api dev",
+    "build": "pnpm --filter api build",
+    "db:migrate": "pnpm --filter api db:migrate",
+    "db:generate": "pnpm --filter api db:generate",
+    "db:studio": "pnpm --filter api db:studio"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
