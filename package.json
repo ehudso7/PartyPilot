@@ -1,0 +1,16 @@
+{
+  "name": "partypilot",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev -w @partypilot/api",
+    "build:api": "npm run build -w @partypilot/api",
+    "start:api": "npm run start -w @partypilot/api"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

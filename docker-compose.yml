@@ -1,0 +1,16 @@
+version: '3.9'
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: partypilot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: partypilot
+      POSTGRES_PASSWORD: partypilot
+      POSTGRES_DB: partypilot
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+volumes:
+  postgres_data:
