@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+.env.*
+coverage
+*.log
+apps/api/dist
+apps/api/node_modules
+apps/web/node_modules
+apps/web/dist

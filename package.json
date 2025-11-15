@@ -1,0 +1,17 @@
+{
+  "name": "partypilot",
+  "version": "0.0.1",
+  "private": true,
+  "description": "PartyPilot monorepo",
+  "scripts": {
+    "dev:api": "npm run dev --workspace apps/api",
+    "build:api": "npm run build --workspace apps/api",
+    "lint": "npm run lint --workspace apps/api"
+  },
+  "workspaces": [
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  }
+}
