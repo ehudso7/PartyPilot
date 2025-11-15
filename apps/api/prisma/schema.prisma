@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  phone     String?
+  trips     Trip[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Trip {
+  id            String         @id @default(cuid())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  city          String
+  dateStart     DateTime
+  dateEnd       DateTime
+  groupSizeMin  Int
+  groupSizeMax  Int
+  occasion      String
+  budgetLevel   String
+  status        String         @default("draft")
+  events        Event[]
+  reservations  Reservation[]
+  notifications Notification[]
+  shareLinks    ShareLink[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Venue {
+  id                String        @id @default(cuid())
+  name              String
+  address           String
+  city              String
+  lat               Float?
+  lng               Float?
+  bookingType       String
+  bookingProvider   String?
+  bookingUrl        String?
+  phone             String?
+  website           String?
+  rating            Float?
+  priceLevel        String?
+  dressCodeSummary  String?
+  groupFriendly     Boolean       @default(false)
+  events            Event[]
+  reservations      Reservation[]
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model Event {
+  id          String         @id @default(cuid())
+  tripId      String
+  trip        Trip           @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  venueId     String?
+  venue       Venue?         @relation(fields: [venueId], references: [id])
+  orderIndex  Int
+  type        String
+  title       String
+  description String?
+  startTime   DateTime
+  endTime     DateTime
+  isPrimary   Boolean        @default(true)
+  reservations Reservation[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([tripId])
+}
+
+model Reservation {
+  id                     String   @id @default(cuid())
+  tripId                 String
+  trip                   Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  eventId                String
+  event                  Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  venueId                String
+  venue                  Venue    @relation(fields: [venueId], references: [id])
+  method                 String
+  bookingProvider        String?
+  providerReservationId  String?
+  nameOnReservation      String
+  partySize              Int
+  reservedTime           DateTime
+  status                 String
+  rawPayload             Json?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([tripId])
+  @@index([eventId])
+  @@index([venueId])
+}
+
+model Notification {
+  id           String   @id @default(cuid())
+  tripId       String
+  trip         Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  type         String
+  scheduledFor DateTime
+  status       String
+  channel      String
+  payload      Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([tripId])
+}
+
+model ShareLink {
+  id        String   @id @default(cuid())
+  tripId    String
+  trip      Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  slug      String   @unique
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([tripId])
+}
