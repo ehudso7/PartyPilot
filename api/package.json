@@ -1,0 +1,9 @@
+{
+  "name": "partypilot-api-vercel",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "dependencies": {
+    "@vercel/node": "^3.0.0"
+  }
+}

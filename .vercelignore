@@ -1,4 +1,18 @@
-node_modules
-.next
-dist
+# Development files
 .env*.local
+*.log
+
+# Build artifacts (don't ignore dist - it's needed for API)
+.next
+
+# API logs
+apps/api/logs
+
+# Test files
+**/*.test.ts
+**/*.spec.ts
+**/coverage
+
+# Documentation
+*.md
+!README.md
