@@ -1,0 +1,30 @@
+{
+  "name": "partypilot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PartyPilot monorepo",
+  "scripts": {
+    "dev": "npm-run-all --parallel dev:api dev:web",
+    "dev:api": "npm run dev -w apps/api",
+    "dev:web": "npm run dev -w apps/web",
+    "build": "npm-run-all build:api build:web",
+    "build:api": "npm run build -w apps/api",
+    "build:web": "npm run build -w apps/web",
+    "lint": "npm-run-all lint:api lint:web",
+    "lint:api": "npm run lint -w apps/api",
+    "lint:web": "npm run lint -w apps/web",
+    "format": "npm-run-all format:api format:web",
+    "format:api": "npm run format -w apps/api",
+    "format:web": "npm run format -w apps/web"
+  },
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "devDependencies": {
+    "npm-run-all": "^4.1.5"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  }
+}
