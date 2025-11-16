@@ -1,0 +1,36 @@
+services:
+  # API Backend
+  - type: web
+    name: partypilot-api
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: cd apps/api && npm install && npm run build
+    startCommand: cd apps/api && npm run deploy && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: DATABASE_URL
+        fromDatabase:
+          name: partypilot-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: LOG_LEVEL
+        value: info
+    healthCheckPath: /health
+
+databases:
+  - name: partypilot-db
+    databaseName: partypilot
+    plan: free
