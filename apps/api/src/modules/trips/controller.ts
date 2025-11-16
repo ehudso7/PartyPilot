@@ -1,16 +1,17 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import * as tripsService from './service';
 import { logger } from '../../config/logger';
+import { AuthRequest } from '../../middleware/auth';
 
-export async function planTrip(req: Request, res: Response) {
+export async function planTrip(req: AuthRequest, res: Response) {
   try {
-    const { prompt, userId } = req.body;
-    
-    if (!prompt || !userId) {
-      return res.status(400).json({ error: 'prompt and userId are required' });
+    const { prompt } = req.body;
+
+    if (!req.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const result = await tripsService.planTrip(prompt, userId);
+    const result = await tripsService.planTrip(prompt, req.userId);
     return res.status(201).json(result);
   } catch (error) {
     logger.error('Error planning trip:', error);
@@ -18,15 +19,25 @@ export async function planTrip(req: Request, res: Response) {
   }
 }
 
-export async function getTrip(req: Request, res: Response) {
+export async function getTrip(req: AuthRequest, res: Response) {
   try {
     const { tripId } = req.params;
+
+    if (!req.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
     const trip = await tripsService.getTripById(tripId);
-    
+
     if (!trip) {
       return res.status(404).json({ error: 'Trip not found' });
     }
-    
+
+    // Authorization: only trip owner can access
+    if (trip.userId !== req.userId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     return res.json(trip);
   } catch (error) {
     logger.error('Error fetching trip:', error);
@@ -34,11 +45,24 @@ export async function getTrip(req: Request, res: Response) {
   }
 }
 
-export async function updateTrip(req: Request, res: Response) {
+export async function updateTrip(req: AuthRequest, res: Response) {
   try {
     const { tripId } = req.params;
     const updates = req.body;
-    
+
+    if (!req.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Verify ownership
+    const existing = await tripsService.getTripById(tripId);
+    if (!existing) {
+      return res.status(404).json({ error: 'Trip not found' });
+    }
+    if (existing.userId !== req.userId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const trip = await tripsService.updateTrip(tripId, updates);
     return res.json(trip);
   } catch (error) {
@@ -47,9 +71,23 @@ export async function updateTrip(req: Request, res: Response) {
   }
 }
 
-export async function getTripEvents(req: Request, res: Response) {
+export async function getTripEvents(req: AuthRequest, res: Response) {
   try {
     const { tripId } = req.params;
+
+    if (!req.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Verify ownership
+    const trip = await tripsService.getTripById(tripId);
+    if (!trip) {
+      return res.status(404).json({ error: 'Trip not found' });
+    }
+    if (trip.userId !== req.userId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const events = await tripsService.getTripEvents(tripId);
     return res.json({ events });
   } catch (error) {
@@ -58,11 +96,25 @@ export async function getTripEvents(req: Request, res: Response) {
   }
 }
 
-export async function exportIcs(req: Request, res: Response) {
+export async function exportIcs(req: AuthRequest, res: Response) {
   try {
     const { tripId } = req.params;
+
+    if (!req.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Verify ownership
+    const trip = await tripsService.getTripById(tripId);
+    if (!trip) {
+      return res.status(404).json({ error: 'Trip not found' });
+    }
+    if (trip.userId !== req.userId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const icsContent = await tripsService.generateIcs(tripId);
-    
+
     res.setHeader('Content-Type', 'text/calendar');
     res.setHeader('Content-Disposition', `attachment; filename="trip-${tripId}.ics"`);
     return res.send(icsContent);
@@ -72,20 +124,51 @@ export async function exportIcs(req: Request, res: Response) {
   }
 }
 
-export async function exportPdf(req: Request, res: Response) {
+export async function exportPdf(req: AuthRequest, res: Response) {
   try {
     const { tripId } = req.params;
-    // PDF generation to be implemented
-    return res.status(501).json({ error: 'PDF export not yet implemented' });
+
+    if (!req.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Verify ownership
+    const trip = await tripsService.getTripById(tripId);
+    if (!trip) {
+      return res.status(404).json({ error: 'Trip not found' });
+    }
+    if (trip.userId !== req.userId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const pdfBuffer = await tripsService.generatePdf(tripId);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="trip-${tripId}.pdf"`);
+    return res.send(pdfBuffer);
   } catch (error) {
     logger.error('Error generating PDF:', error);
     return res.status(500).json({ error: 'Failed to generate PDF' });
   }
 }
 
-export async function getShareLink(req: Request, res: Response) {
+export async function getShareLink(req: AuthRequest, res: Response) {
   try {
     const { tripId } = req.params;
+
+    if (!req.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Verify ownership
+    const trip = await tripsService.getTripById(tripId);
+    if (!trip) {
+      return res.status(404).json({ error: 'Trip not found' });
+    }
+    if (trip.userId !== req.userId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const shareLink = await tripsService.getOrCreateShareLink(tripId);
     return res.json({ url: shareLink });
   } catch (error) {
@@ -94,9 +177,23 @@ export async function getShareLink(req: Request, res: Response) {
   }
 }
 
-export async function bootstrapNotifications(req: Request, res: Response) {
+export async function bootstrapNotifications(req: AuthRequest, res: Response) {
   try {
     const { tripId } = req.params;
+
+    if (!req.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Verify ownership
+    const trip = await tripsService.getTripById(tripId);
+    if (!trip) {
+      return res.status(404).json({ error: 'Trip not found' });
+    }
+    if (trip.userId !== req.userId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const notifications = await tripsService.bootstrapNotifications(tripId);
     return res.json({ notifications });
   } catch (error) {
