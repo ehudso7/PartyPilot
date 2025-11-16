@@ -1,5 +1,51 @@
 {
-  "buildCommand": "cd apps/web && npm install && npm run build",
-  "outputDirectory": "apps/web/.next",
-  "installCommand": "npm install"
+  "version": 2,
+  "builds": [
+    {
+      "src": "apps/web/package.json",
+      "use": "@vercel/next"
+    },
+    {
+      "src": "api/index.ts",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["apps/api/**"]
+      }
+    },
+    {
+      "src": "api/cron/notifications.ts",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["apps/api/**"]
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/cron/notifications",
+      "dest": "/api/cron/notifications.ts"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.ts"
+    },
+    {
+      "src": "/health",
+      "dest": "/api/index.ts"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/apps/web/$1"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/notifications",
+      "schedule": "*/5 * * * *"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "installCommand": "cd apps/api && npm install && cd ../web && npm install"
 }
