@@ -2,9 +2,11 @@ import prisma from '../../db/prismaClient';
 import * as plannerService from '../planner/service';
 import * as repository from './repository';
 import { logger } from '../../config/logger';
+import { generateTripPDF } from './pdf';
+import { nanoid } from 'nanoid';
 
 export async function planTrip(prompt: string, userId: string) {
-  logger.info('Planning trip for user:', userId);
+  logger.info('Planning trip for user:', {userId});
   
   // Use planner service to parse prompt
   const planData = await plannerService.parsePlannerPrompt(prompt);
@@ -99,13 +101,20 @@ export async function generateIcs(tripId: string): Promise<string> {
   return icsContent;
 }
 
+export async function generatePdf(tripId: string): Promise<Buffer> {
+  const trip = await getTripById(tripId);
+  if (!trip) throw new Error('Trip not found');
+
+  return await generateTripPDF(trip);
+}
+
 export async function getOrCreateShareLink(tripId: string): Promise<string> {
   let shareLink = await prisma.shareLink.findFirst({
     where: { tripId },
   });
-  
+
   if (!shareLink) {
-    const slug = `${tripId.substring(0, 8)}-${Date.now()}`;
+    const slug = nanoid(12);  // Cryptographically secure random slug
     shareLink = await prisma.shareLink.create({
       data: {
         tripId,
@@ -113,7 +122,7 @@ export async function getOrCreateShareLink(tripId: string): Promise<string> {
       },
     });
   }
-  
+
   return `${process.env.APP_URL || 'http://localhost:3000'}/t/${shareLink.slug}`;
 }
 
