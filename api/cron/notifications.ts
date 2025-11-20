@@ -1,6 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import prisma from '../../apps/api/src/db/prismaClient';
 import { logger } from '../../apps/api/src/config/logger';
+import { config } from '../../apps/api/src/config/env';
 
 // This function is called by Vercel Cron Jobs
 // Configure in vercel.json under "crons"

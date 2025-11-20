@@ -11,6 +11,7 @@ export const config = {
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000',
   appUrl: process.env.APP_URL || 'http://localhost:3000',
   sentryDsn: process.env.SENTRY_DSN || '',
+  cronSecret: process.env.CRON_SECRET || '',
 };
 
 export function validateConfig() {

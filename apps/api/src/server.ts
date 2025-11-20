@@ -2,9 +2,11 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import compression from 'compression';
 import * as Sentry from '@sentry/node';
 import { config } from './config/env';
 import { logger } from './config/logger';
+import prisma from './db/prismaClient';
 
 // Routes
 import authRoutes from './routes/auth';
@@ -83,6 +85,17 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
+// Response compression (gzip/deflate)
+app.use(compression({
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  },
+  level: 6, // Balanced compression level
+}));
+
 // Body parsing with size limits
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
@@ -139,14 +152,46 @@ const authLimiter = rateLimit({
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 
+// OpenAPI/Swagger Documentation
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from './config/swagger';
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'PartyPilot API Docs',
+}));
+
+// Swagger JSON endpoint
+app.get('/api-docs.json', (req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
+
 // Health check (no auth required)
-app.get('/health', (req: Request, res: Response) => {
-  res.json({
+app.get('/health', async (req: Request, res: Response) => {
+  const healthStatus = {
     status: 'ok',
     timestamp: new Date().toISOString(),
     version: '1.0.0',
     environment: config.nodeEnv,
-  });
+    checks: {
+      database: 'unknown',
+      api: 'ok',
+    },
+  };
+
+  // Check database connectivity
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    healthStatus.checks.database = 'healthy';
+  } catch (error) {
+    healthStatus.status = 'degraded';
+    healthStatus.checks.database = 'unhealthy';
+    logger.error('Database health check failed:', error);
+  }
+
+  const statusCode = healthStatus.status === 'ok' ? 200 : 503;
+  res.status(statusCode).json(healthStatus);
 });
 
 // API Routes (v1)

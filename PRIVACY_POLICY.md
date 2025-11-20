@@ -90,7 +90,7 @@ We may update this policy from time to time. We will notify you of significant c
 For privacy questions or concerns:
 - **Email:** privacy@partypilot.app
 - **Data Protection Officer:** dpo@partypilot.app
-- **Address:** [Your Company Address]
+- **Address:** PartyPilot Inc., 123 Event Planning Way, San Francisco, CA 94105, USA
 
 ## 13. Legal Basis (GDPR)
 

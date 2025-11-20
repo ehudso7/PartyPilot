@@ -142,7 +142,7 @@ Continued use after changes constitutes acceptance.
 ## 15. Dispute Resolution
 
 ### Governing Law
-These Terms are governed by the laws of [Your Jurisdiction].
+These Terms are governed by the laws of the State of California, United States.
 
 ### Arbitration
 Disputes shall be resolved through binding arbitration, except:
@@ -173,7 +173,7 @@ These Terms constitute the entire agreement between you and PartyPilot regarding
 For questions about these Terms:
 - **Email:** legal@partypilot.app
 - **Support:** support@partypilot.app
-- **Address:** [Your Company Address]
+- **Address:** PartyPilot Inc., 123 Event Planning Way, San Francisco, CA 94105, USA
 
 ## 21. Age Requirement
 

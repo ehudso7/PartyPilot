@@ -39,23 +39,50 @@ async function sendPendingNotifications() {
 }
 
 async function sendNotification(notification: any) {
-  // Stub implementation - in production, integrate with:
-  // - Firebase Cloud Messaging for push notifications
-  // - Twilio for SMS
-  // - SendGrid for email
-  // - etc.
-
   const payload = notification.payload as any;
+  
+  // Import notification service
+  const { sendNotification: sendNotif } = await import('../services/notifications');
+  
+  // Get recipient info (user's device token, phone, or email)
+  // In production, fetch from user preferences/device registrations
+  const recipient = notification.trip?.user?.email || 'user@example.com';
+  
+  const notificationPayload = {
+    type: notification.type,
+    tripId: notification.tripId,
+    message: payload.message || 'You have a trip update',
+    title: getTitleForNotificationType(notification.type),
+    data: {
+      tripId: notification.tripId,
+      notificationId: notification.id,
+    },
+  };
 
-  logger.info('Sending notification', {
+  const success = await sendNotif(
+    notification.channel,
+    recipient,
+    notificationPayload
+  );
+
+  logger.info('Notification sent', {
+    success,
     type: notification.type,
     channel: notification.channel,
     tripId: notification.tripId,
-    message: payload.message,
   });
 
-  // Simulate notification sending
-  return Promise.resolve();
+  return success;
+}
+
+function getTitleForNotificationType(type: string): string {
+  const titles: Record<string, string> = {
+    weather_check: '🌤️ Weather Update',
+    headcount: '👥 Headcount Confirmation',
+    dress_code: '👔 Dress Code Reminder',
+    leave_now: '🚗 Time to Leave!',
+  };
+  return titles[type] || 'PartyPilot Update';
 }
 
 export function startNotificationScheduler() {
