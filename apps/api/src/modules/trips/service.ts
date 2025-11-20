@@ -51,7 +51,7 @@ export async function getTripById(tripId: string) {
   return await repository.getTripWithDetails(tripId);
 }
 
-export async function updateTrip(tripId: string, updates: any) {
+export async function updateTrip(tripId: string, updates: unknown) {
   return await repository.updateTrip(tripId, updates);
 }
 

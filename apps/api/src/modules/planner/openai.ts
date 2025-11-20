@@ -3,8 +3,35 @@ import { config } from '../../config/env';
 import { logger } from '../../config/logger';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import pRetry from 'p-retry';
+import { createCircuitBreaker } from '../../utils/circuitBreaker';
 
 const openai = config.openaiApiKey ? new OpenAI({ apiKey: config.openaiApiKey }) : null;
+
+// Create circuit breaker for OpenAI API calls
+let openaiCircuitBreaker: ReturnType<typeof createCircuitBreaker> | null = null;
+
+if (openai) {
+  const openaiCall = async (systemPrompt: string, userPrompt: string) => {
+    const result = await openai!.chat.completions.create({
+      model: 'gpt-4-turbo-preview',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.7,
+    });
+    return result;
+  };
+
+  openaiCircuitBreaker = createCircuitBreaker(openaiCall, {
+    name: 'OpenAI',
+    timeout: 30000,
+    errorThresholdPercentage: 50,
+    resetTimeout: 60000,
+  });
+}
 
 interface PlannerOutput {
   title: string;
@@ -46,15 +73,24 @@ Important:
 - Events should be chronological and realistic
 - Return ONLY valid JSON, no markdown or explanations`;
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: prompt },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.7,
-    });
+    // Use circuit breaker with retry logic for OpenAI API calls
+    if (!openaiCircuitBreaker) {
+      throw new Error('OpenAI circuit breaker not initialized');
+    }
+
+    const completion = await pRetry(
+      async () => {
+        return await openaiCircuitBreaker!.fire(systemPrompt, prompt);
+      },
+      {
+        retries: 3,
+        minTimeout: 1000,
+        maxTimeout: 5000,
+        onFailedAttempt: (error) => {
+          logger.warn(`OpenAI API attempt ${error.attemptNumber} failed:`, error.message);
+        },
+      }
+    );
 
     const content = completion.choices[0]?.message?.content;
     if (!content) {

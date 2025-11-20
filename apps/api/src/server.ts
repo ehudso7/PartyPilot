@@ -3,6 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import * as Sentry from '@sentry/node';
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from './config/swagger';
 import { config } from './config/env';
 import { logger } from './config/logger';
 
@@ -139,14 +141,34 @@ const authLimiter = rateLimit({
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 
+// API Documentation (no auth required)
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 // Health check (no auth required)
-app.get('/health', (req: Request, res: Response) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    version: '1.0.0',
-    environment: config.nodeEnv,
-  });
+app.get('/health', async (req: Request, res: Response) => {
+  try {
+    // Check database connection
+    const prisma = (await import('./db/prismaClient')).default;
+    await prisma.$queryRaw`SELECT 1`;
+    
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      version: '1.0.0',
+      environment: config.nodeEnv,
+      database: 'connected',
+    });
+  } catch (error) {
+    logger.error('Health check failed:', error);
+    res.status(503).json({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      version: '1.0.0',
+      environment: config.nodeEnv,
+      database: 'disconnected',
+      error: 'Database health check failed',
+    });
+  }
 });
 
 // API Routes (v1)

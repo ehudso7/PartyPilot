@@ -1,6 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
+import { tripsApi } from '@/lib/api';
 import styles from './page.module.css';
 
 export default function Home() {
@@ -8,6 +11,14 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [trip, setTrip] = useState<any>(null);
   const [error, setError] = useState('');
+  const { isAuthenticated, loading: authLoading, user, logout } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push('/login');
+    }
+  }, [isAuthenticated, authLoading, router]);
 
   const handlePlanTrip = async () => {
     if (!prompt.trim()) return;
@@ -16,21 +27,7 @@ export default function Home() {
     setError('');
     
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${apiUrl}/api/trips/plan`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt,
-          userId: 'demo-user-001', // For MVP
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to plan trip');
-      }
-
-      const data = await response.json();
+      const data = await tripsApi.plan(prompt);
       setTrip(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -39,13 +36,76 @@ export default function Home() {
     }
   };
 
+  const handleExportIcs = async () => {
+    if (!trip?.trip?.id) return;
+    try {
+      const blob = await tripsApi.exportIcs(trip.trip.id);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `trip-${trip.trip.id}.ics`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to export calendar');
+    }
+  };
+
+  const handleExportPdf = async () => {
+    if (!trip?.trip?.id) return;
+    try {
+      const blob = await tripsApi.exportPdf(trip.trip.id);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `trip-${trip.trip.id}.pdf`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to export PDF');
+    }
+  };
+
+  const handleGetShareLink = async () => {
+    if (!trip?.trip?.id) return;
+    try {
+      const response = await tripsApi.getShareLink(trip.trip.id);
+      await navigator.clipboard.writeText(response.url);
+      alert('Share link copied to clipboard!');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to get share link');
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <main className={styles.main}>
+        <div className={styles.container}>Loading...</div>
+      </main>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null; // Will redirect
+  }
+
   return (
     <main className={styles.main}>
       <div className={styles.container}>
-        <h1 className={styles.title}>🎉 PartyPilot</h1>
-        <p className={styles.subtitle}>
-          AI-powered event planning from a single prompt
-        </p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+          <div>
+            <h1 className={styles.title}>🎉 PartyPilot</h1>
+            <p className={styles.subtitle}>
+              AI-powered event planning from a single prompt
+            </p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <span>Welcome, {user?.name}</span>
+            <button onClick={logout} style={{ padding: '0.5rem 1rem', cursor: 'pointer' }}>
+              Logout
+            </button>
+          </div>
+        </div>
 
         <div className={styles.inputSection}>
           <textarea
@@ -100,13 +160,13 @@ export default function Home() {
             ))}
 
             <div className={styles.actions}>
-              <button className={styles.actionButton}>
+              <button className={styles.actionButton} onClick={handleExportIcs}>
                 📅 Download Calendar (.ics)
               </button>
-              <button className={styles.actionButton}>
+              <button className={styles.actionButton} onClick={handleExportPdf}>
                 📄 Download PDF
               </button>
-              <button className={styles.actionButton}>
+              <button className={styles.actionButton} onClick={handleGetShareLink}>
                 🔗 Get Share Link
               </button>
             </div>
