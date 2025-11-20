@@ -10,7 +10,10 @@ export async function getTripWithDetails(tripId: string) {
     include: {
       events: {
         include: { venue: true },
-        orderBy: { orderIndex: 'asc' },
+        orderBy: [
+          { orderIndex: 'asc' },
+          { isPrimary: 'desc' },
+        ],
       },
       reservations: true,
       notifications: true,

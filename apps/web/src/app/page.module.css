@@ -33,6 +33,63 @@
   font-size: 1.1rem;
 }
 
+.authCard {
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+}
+
+.authToggle {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.authToggle button {
+  flex: 1;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: 1px solid #cbd5ff;
+  background: white;
+  color: #667eea;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.authToggleActive {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: white !important;
+  border-color: transparent !important;
+}
+
+.input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+}
+
+.userBadge {
+  margin-top: 1rem;
+  font-size: 0.95rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.linkButton {
+  background: none;
+  border: none;
+  color: #667eea;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
 .inputSection {
   margin-bottom: 2rem;
 }
@@ -170,6 +227,12 @@
   font-size: 1.2rem;
 }
 
+.venueLine {
+  color: #444;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
 .eventType {
   display: inline-block;
   background: #667eea;
@@ -191,6 +254,11 @@
   color: #777;
   font-size: 0.95rem;
   margin: 0;
+}
+
+.backupCard {
+  border: 1px dashed rgba(102, 126, 234, 0.5);
+  background: rgba(102, 126, 234, 0.08);
 }
 
 .actions {
@@ -219,6 +287,39 @@
   color: white;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.shareBanner {
+  margin-top: 1rem;
+  background: #eef2ff;
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px solid #cbd5ff;
+}
+
+.shareBanner a {
+  color: #4c51bf;
+  font-weight: 600;
+}
+
+.reservationCard {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: white;
+}
+
+.reservationRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.reservationRow:last-child {
+  border-bottom: none;
 }
 
 @media (max-width: 768px) {

@@ -4,14 +4,14 @@ import * as repository from './repository';
 import { logger } from '../../config/logger';
 import { generateTripPDF } from './pdf';
 import { nanoid } from 'nanoid';
+import * as venuesService from '../venues/service';
+import * as venuesRepository from '../venues/repository';
 
 export async function planTrip(prompt: string, userId: string) {
-  logger.info('Planning trip for user:', {userId});
+  logger.info('Planning trip for user', { userId });
   
-  // Use planner service to parse prompt
   const planData = await plannerService.parsePlannerPrompt(prompt);
   
-  // Create trip in database
   const trip = await repository.createTrip({
     userId,
     title: planData.title,
@@ -25,26 +25,63 @@ export async function planTrip(prompt: string, userId: string) {
     status: 'draft',
   });
   
-  // Create events
-  const events = [];
-  for (let i = 0; i < planData.events.length; i++) {
-    const eventData = planData.events[i];
-    const event = await prisma.event.create({
+  const sortedEvents = [...planData.events].sort((a, b) => a.orderIndex - b.orderIndex);
+  const matchedVenueIds = new Set<string>();
+  
+  for (const eventData of sortedEvents) {
+    const baseEventData = {
+      tripId: trip.id,
+      orderIndex: eventData.orderIndex,
+      type: eventData.type,
+      title: eventData.label,
+      description: eventData.notes || null,
+      startTime: new Date(eventData.timeWindow.start),
+      endTime: new Date(eventData.timeWindow.end),
+    };
+    
+    const venueMatch = await venuesService.findBestMatches(
+      planData.city,
+      eventData.primaryVenueRequirements,
+      eventData.backupVenueRequirements,
+    );
+    
+    await prisma.event.create({
       data: {
-        tripId: trip.id,
-        orderIndex: i,
-        type: eventData.type,
-        title: eventData.title,
-        description: eventData.description || null,
-        startTime: new Date(eventData.startTime),
-        endTime: new Date(eventData.endTime),
+        ...baseEventData,
         isPrimary: true,
+        venueId: venueMatch.primary?.id ?? null,
       },
     });
-    events.push(event);
+    
+    if (venueMatch.primary?.id) {
+      matchedVenueIds.add(venueMatch.primary.id);
+    }
+    
+    for (const backupVenue of venueMatch.backups) {
+      await prisma.event.create({
+        data: {
+          ...baseEventData,
+          title: `${eventData.label} (Plan B)`,
+          isPrimary: false,
+          venueId: backupVenue.id,
+        },
+      });
+      matchedVenueIds.add(backupVenue.id);
+    }
   }
   
-  return { trip, events, venues: [] };
+  const events = await prisma.event.findMany({
+    where: { tripId: trip.id },
+    include: { venue: true },
+    orderBy: [
+      { orderIndex: 'asc' },
+      { isPrimary: 'desc' },
+    ],
+  });
+  
+  const venues = await venuesRepository.findVenuesByIds(Array.from(matchedVenueIds));
+  
+  return { trip, events, venues };
 }
 
 export async function getTripById(tripId: string) {
@@ -67,7 +104,7 @@ export async function generateIcs(tripId: string): Promise<string> {
   const trip = await getTripById(tripId);
   if (!trip) throw new Error('Trip not found');
   
-  const events = trip.events || [];
+  const events = (trip.events || []).filter((event) => event.isPrimary);
   
   let icsContent = 'BEGIN:VCALENDAR\r\n';
   icsContent += 'VERSION:2.0\r\n';
@@ -83,7 +120,8 @@ export async function generateIcs(tripId: string): Promise<string> {
     icsContent += `UID:${event.id}@partypilot.app\r\n`;
     icsContent += `DTSTART:${formatDate(new Date(event.startTime))}\r\n`;
     icsContent += `DTEND:${formatDate(new Date(event.endTime))}\r\n`;
-    icsContent += `SUMMARY:${event.title}\r\n`;
+    const summary = event.venue ? `${event.title} @ ${event.venue.name}` : event.title;
+    icsContent += `SUMMARY:${summary}\r\n`;
     
     if (event.venue) {
       icsContent += `LOCATION:${event.venue.address}\r\n`;
@@ -132,6 +170,7 @@ export async function bootstrapNotifications(tripId: string) {
   
   const notifications = [];
   const tripStart = new Date(trip.dateStart);
+  const now = new Date();
   
   // Weather check - 48 hours before
   const weatherTime = new Date(tripStart.getTime() - 48 * 60 * 60 * 1000);
@@ -177,6 +216,35 @@ export async function bootstrapNotifications(tripId: string) {
       },
     })
   );
+  
+  const primaryEvents = (trip.events || [])
+    .filter((event) => event.isPrimary)
+    .sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+  
+  const leaveNowLeadMinutes = 20;
+  
+  for (const event of primaryEvents) {
+    const leaveAt = new Date(new Date(event.startTime).getTime() - leaveNowLeadMinutes * 60 * 1000);
+    if (leaveAt <= now) {
+      continue;
+    }
+    
+    notifications.push(
+      await prisma.notification.create({
+        data: {
+          tripId,
+          type: 'leave_now',
+          scheduledFor: leaveAt,
+          status: 'scheduled',
+          channel: 'push',
+          payload: {
+            message: `Leave now for ${event.title}`,
+            eventId: event.id,
+          },
+        },
+      })
+    );
+  }
   
   return notifications;
 }

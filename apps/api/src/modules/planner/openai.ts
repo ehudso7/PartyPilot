@@ -3,28 +3,11 @@ import { config } from '../../config/env';
 import { logger } from '../../config/logger';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { PlannerPlan, PlannerEvent } from './types';
 
 const openai = config.openaiApiKey ? new OpenAI({ apiKey: config.openaiApiKey }) : null;
 
-interface PlannerOutput {
-  title: string;
-  city: string;
-  dateStart: string;
-  dateEnd: string;
-  groupSizeMin: number;
-  groupSizeMax: number;
-  occasion: string;
-  budgetLevel: string;
-  events: Array<{
-    type: string;
-    title: string;
-    description?: string;
-    startTime: string;
-    endTime: string;
-  }>;
-}
-
-export async function parsePlannerPrompt(prompt: string): Promise<PlannerOutput> {
+export async function parsePlannerPrompt(prompt: string): Promise<PlannerPlan> {
   if (!openai) {
     logger.warn('OpenAI API key not configured, using fallback planning');
     return getFallbackPlan(prompt);
@@ -61,8 +44,8 @@ Important:
       throw new Error('No response from OpenAI');
     }
 
-    const parsed = JSON.parse(content);
-    logger.info('Trip plan generated via OpenAI', { title: parsed.title });
+      const parsed = JSON.parse(content) as PlannerPlan;
+      logger.info('Trip plan generated via OpenAI', { title: parsed.title, city: parsed.city });
 
     return parsed;
   } catch (error) {
@@ -71,7 +54,19 @@ Important:
   }
 }
 
-function getFallbackPlan(prompt: string): PlannerOutput {
+function buildTimeWindow(baseDate: Date, startHour: number, endHour: number) {
+  const start = new Date(baseDate);
+  start.setHours(startHour, 0, 0, 0);
+  const end = new Date(baseDate);
+  end.setHours(endHour, 0, 0, 0);
+
+  return {
+    start: start.toISOString(),
+    end: end.toISOString(),
+  };
+}
+
+function getFallbackPlan(prompt: string): PlannerPlan {
   const now = new Date();
   const dateStart = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
   const dateEnd = new Date(dateStart);
@@ -92,6 +87,66 @@ function getFallbackPlan(prompt: string): PlannerOutput {
     groupSize = parseInt(groupMatch[1]);
   }
 
+  const events: PlannerEvent[] = [
+    {
+      orderIndex: 0,
+      type: 'meetup',
+      label: 'Kickoff Meetup',
+      notes: 'Meet the crew and align on the night.',
+      timeWindow: buildTimeWindow(dateStart, 17, 18),
+      primaryVenueRequirements: {
+        tags: ['lounge'],
+        groupFriendly: true,
+      },
+      backupVenueRequirements: [
+        { tags: ['bar'], groupFriendly: true },
+      ],
+    },
+    {
+      orderIndex: 1,
+      type: 'meal',
+      label: 'Group Dinner',
+      notes: 'Comfort food to fuel the festivities.',
+      timeWindow: buildTimeWindow(dateStart, 18, 20),
+      primaryVenueRequirements: {
+        tags: ['italian'],
+        priceLevel: 'medium',
+        groupFriendly: true,
+      },
+      backupVenueRequirements: [
+        { tags: ['family'], groupFriendly: true },
+      ],
+    },
+    {
+      orderIndex: 2,
+      type: 'bar',
+      label: 'Games & Drinks',
+      notes: 'Arcade vibes or bowling to keep energy up.',
+      timeWindow: buildTimeWindow(dateStart, 20, 22),
+      primaryVenueRequirements: {
+        tags: ['arcade', 'games'],
+        groupFriendly: true,
+      },
+      backupVenueRequirements: [
+        { tags: ['bowling'], groupFriendly: true },
+      ],
+    },
+    {
+      orderIndex: 3,
+      type: 'club',
+      label: 'Rooftop Nightcap',
+      notes: 'Wrap up with skyline views and music.',
+      timeWindow: buildTimeWindow(dateStart, 22, 24),
+      primaryVenueRequirements: {
+        tags: ['rooftop'],
+        dressCode: 'smart',
+      },
+      backupVenueRequirements: [
+        { tags: ['club'], dressCode: 'smart' },
+      ],
+    },
+  ];
+
   return {
     title: 'Your Event',
     city,
@@ -100,29 +155,7 @@ function getFallbackPlan(prompt: string): PlannerOutput {
     groupSizeMin: Math.max(1, groupSize - 2),
     groupSizeMax: groupSize + 2,
     occasion: 'celebration',
-    budgetLevel: 'medium',
-    events: [
-      {
-        type: 'meetup',
-        title: 'Kickoff Meetup',
-        description: 'Starting point for the evening',
-        startTime: new Date(dateStart.setHours(17, 0, 0, 0)).toISOString(),
-        endTime: new Date(dateStart.setHours(18, 0, 0, 0)).toISOString(),
-      },
-      {
-        type: 'meal',
-        title: 'Dinner',
-        description: 'Group dinner',
-        startTime: new Date(dateStart.setHours(18, 30, 0, 0)).toISOString(),
-        endTime: new Date(dateStart.setHours(20, 30, 0, 0)).toISOString(),
-      },
-      {
-        type: 'bar',
-        title: 'Evening Activity',
-        description: 'Bar or lounge',
-        startTime: new Date(dateStart.setHours(21, 0, 0, 0)).toISOString(),
-        endTime: new Date(dateStart.setHours(23, 0, 0, 0)).toISOString(),
-      },
-    ],
+    budgetLevel: groupSize >= 12 ? 'medium' : 'low',
+    events,
   };
 }

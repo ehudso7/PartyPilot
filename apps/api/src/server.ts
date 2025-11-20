@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import * as Sentry from '@sentry/node';
+import { ZodError } from 'zod';
 import { config } from './config/env';
 import { logger } from './config/logger';
 
@@ -115,6 +116,7 @@ const globalLimiter = rateLimit({
 });
 
 app.use('/api/', globalLimiter);
+app.use('/api/v1/', globalLimiter);
 
 // Strict rate limiting for expensive operations
 const planLimiter = rateLimit({
@@ -126,6 +128,7 @@ const planLimiter = rateLimit({
 });
 
 app.use('/api/trips/plan', planLimiter);
+app.use('/api/v1/trips/plan', planLimiter);
 
 // Auth rate limiting
 const authLimiter = rateLimit({
@@ -138,6 +141,8 @@ const authLimiter = rateLimit({
 
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
+app.use('/api/v1/auth/login', authLimiter);
+app.use('/api/v1/auth/register', authLimiter);
 
 // Health check (no auth required)
 app.get('/health', (req: Request, res: Response) => {
@@ -182,8 +187,21 @@ if (config.sentryDsn) {
 // Global error handler
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   // Don't log validation errors as errors
-  if (err.name === 'ZodError' || err.message.includes('Validation')) {
-    return next();
+  if (err instanceof ZodError) {
+    return res.status(400).json({
+      error: 'Validation failed',
+      details: err.errors.map((issue) => ({
+        path: issue.path.join('.'),
+        message: issue.message,
+      })),
+    });
+  }
+  
+  if (err.message?.includes('Validation')) {
+    return res.status(400).json({
+      error: 'Validation failed',
+      message: err.message,
+    });
   }
 
   logger.error('Unhandled error', {

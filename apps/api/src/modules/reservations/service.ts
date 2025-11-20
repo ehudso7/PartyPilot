@@ -1,96 +1,156 @@
+import { Prisma, Reservation } from '@prisma/client';
 import prisma from '../../db/prismaClient';
 import { logger } from '../../config/logger';
 
-export async function prepareReservations(tripId: string, eventIds: string[]) {
-  const reservations = [];
-  
-  for (const eventId of eventIds) {
-    const event = await prisma.event.findUnique({
-      where: { id: eventId },
-      include: { venue: true, trip: true },
-    });
-    
-    if (!event || !event.venue) {
-      logger.warn(`Event ${eventId} not found or has no venue`);
+interface PrepareReservationsResult {
+  reservations: Array<Reservation & { bookingUrl?: string | null }>;
+  skippedEventIds: string[];
+}
+
+function extractBookingUrl(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== 'object') {
+    return undefined;
+  }
+
+  if ('bookingUrl' in payload && typeof (payload as any).bookingUrl === 'string') {
+    return (payload as any).bookingUrl;
+  }
+
+  return undefined;
+}
+
+export async function prepareReservations(userId: string, tripId: string, eventIds: string[]): Promise<PrepareReservationsResult> {
+  const trip = await prisma.trip.findUnique({
+    where: { id: tripId },
+    include: {
+      events: {
+        include: { venue: true },
+      },
+      user: true,
+    },
+  });
+
+  if (!trip || trip.userId !== userId) {
+    throw new Error('Trip not found');
+  }
+
+  const requestedEventIds = new Set(eventIds);
+  const relevantEvents = trip.events.filter((event) => requestedEventIds.has(event.id));
+
+  const reservations: Array<Reservation & { bookingUrl?: string | null }> = [];
+  const skipped = new Set<string>();
+  const nameOnReservation = trip.user?.name || 'PartyPilot Guest';
+
+  for (const event of relevantEvents) {
+    if (!event.isPrimary) {
+      skipped.add(event.id);
       continue;
     }
-    
+
+    if (!event.venueId || !event.venue) {
+      skipped.add(event.id);
+      continue;
+    }
+
+    const existingReservation = await prisma.reservation.findFirst({
+      where: { eventId: event.id },
+    });
+
+    if (existingReservation) {
+      reservations.push({
+        ...existingReservation,
+        bookingUrl: extractBookingUrl(existingReservation.rawPayload),
+      });
+      continue;
+    }
+
     const venue = event.venue;
-    let method = venue.bookingType;
-    let status = 'pending';
-    let bookingUrl = venue.bookingUrl;
-    
-    if (method === 'deeplink') {
-      // Build booking URL with parameters
-      if (bookingUrl) {
-        const partySize = event.trip.groupSizeMax;
-        const dateTime = new Date(event.startTime).toISOString();
-        bookingUrl = `${bookingUrl}?party_size=${partySize}&datetime=${dateTime}`;
-        status = 'link_ready';
-      }
-    } else if (method === 'api') {
-      // For API method, we'll prepare but not book yet
-      status = 'pending';
+    const method = venue.bookingType || 'manual';
+    let status: Reservation['status'] = 'pending';
+    let bookingUrl = venue.bookingUrl || undefined;
+
+    if (method === 'deeplink' && bookingUrl) {
+      const partySize = trip.groupSizeMax;
+      const dateTime = new Date(event.startTime).toISOString();
+      const connector = bookingUrl.includes('?') ? '&' : '?';
+      bookingUrl = `${bookingUrl}${connector}party_size=${partySize}&datetime=${encodeURIComponent(dateTime)}`;
+      status = 'link_ready';
     } else if (method === 'webview_form') {
       status = 'link_ready';
-    } else if (method === 'manual') {
+    } else if (method === 'api') {
+      status = 'pending';
+    } else {
       status = 'pending';
     }
-    
+
+    const rawPayload: Prisma.JsonObject = {};
+    if (bookingUrl) {
+      rawPayload.bookingUrl = bookingUrl;
+    }
+
     const reservation = await prisma.reservation.create({
       data: {
         tripId,
-        eventId,
+        eventId: event.id,
         venueId: venue.id,
         method,
         bookingProvider: venue.bookingProvider,
-        nameOnReservation: 'Guest',
-        partySize: event.trip.groupSizeMax,
+        nameOnReservation,
+        partySize: trip.groupSizeMax,
         reservedTime: event.startTime,
         status,
-        rawPayload: { bookingUrl } as any,
+        rawPayload: Object.keys(rawPayload).length ? rawPayload : undefined,
       },
     });
-    
+
     reservations.push({
       ...reservation,
-      bookingUrl,
+      bookingUrl: bookingUrl || null,
     });
   }
-  
-  return reservations;
+
+  for (const id of eventIds) {
+    if (!relevantEvents.find((event) => event.id === id)) {
+      skipped.add(id);
+    }
+  }
+
+  return {
+    reservations,
+    skippedEventIds: Array.from(skipped),
+  };
 }
 
-export async function bookReservation(reservationId: string) {
+export async function bookReservation(userId: string, reservationId: string) {
   const reservation = await prisma.reservation.findUnique({
     where: { id: reservationId },
-    include: { venue: true },
+    include: { venue: true, trip: true },
   });
-  
-  if (!reservation) {
+
+  if (!reservation || reservation.trip.userId !== userId) {
     throw new Error('Reservation not found');
   }
-  
+
   if (reservation.method !== 'api') {
     throw new Error('Only API method reservations can be booked this way');
   }
-  
-  // Simulate API booking (in production, call actual provider API)
-  logger.info(`Booking reservation ${reservationId} via ${reservation.bookingProvider}`);
-  
-  const updated = await prisma.reservation.update({
+
+  logger.info('Booking reservation via provider', {
+    reservationId,
+    provider: reservation.bookingProvider,
+  });
+
+  return prisma.reservation.update({
     where: { id: reservationId },
     data: {
       status: 'confirmed',
       providerReservationId: `MOCK-${Date.now()}`,
     },
   });
-  
-  return updated;
 }
 
-export async function getReservationById(reservationId: string) {
-  return await prisma.reservation.findUnique({
+export async function getReservationById(userId: string, reservationId: string) {
+  const reservation = await prisma.reservation.findUnique({
     where: { id: reservationId },
     include: {
       venue: true,
@@ -98,4 +158,10 @@ export async function getReservationById(reservationId: string) {
       trip: true,
     },
   });
+
+  if (!reservation || reservation.trip.userId !== userId) {
+    return null;
+  }
+
+  return reservation;
 }

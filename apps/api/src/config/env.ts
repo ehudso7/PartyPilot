@@ -14,7 +14,16 @@ export const config = {
 };
 
 export function validateConfig() {
-  const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET'];
+  const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET', 'APP_URL'];
+  
+  if (process.env.NODE_ENV === 'production') {
+    requiredEnvVars.push('OPENAI_API_KEY');
+  }
+  
+  if (process.env.CRON_SECRET_REQUIRED === 'true' || process.env.VERCEL === '1') {
+    requiredEnvVars.push('CRON_SECRET');
+  }
+  
   const missing = requiredEnvVars.filter(key => !process.env[key]);
 
   if (missing.length > 0) {
@@ -27,7 +36,7 @@ export function validateConfig() {
   }
 
   // Warn about optional but recommended vars
-  const recommended = ['OPENAI_API_KEY', 'SENTRY_DSN'];
+  const recommended = ['SENTRY_DSN', 'CRON_SECRET'];
   const missingRecommended = recommended.filter(key => !process.env[key]);
   if (missingRecommended.length > 0) {
     console.warn(`Warning: Missing recommended environment variables: ${missingRecommended.join(', ')}`);
