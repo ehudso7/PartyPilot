@@ -1,6 +1,32 @@
 import prisma from '../../db/prismaClient';
+import { Prisma } from '@prisma/client';
 
-export async function createTrip(data: any) {
+export type CreateTripInput = {
+  userId: string;
+  title: string;
+  city: string;
+  dateStart: Date;
+  dateEnd: Date;
+  groupSizeMin: number;
+  groupSizeMax: number;
+  occasion: string;
+  budgetLevel: string;
+  status?: string;
+};
+
+export type UpdateTripInput = {
+  title?: string;
+  city?: string;
+  dateStart?: Date;
+  dateEnd?: Date;
+  groupSizeMin?: number;
+  groupSizeMax?: number;
+  occasion?: string;
+  budgetLevel?: string;
+  status?: string;
+};
+
+export async function createTrip(data: CreateTripInput) {
   return await prisma.trip.create({ data });
 }
 
@@ -19,7 +45,7 @@ export async function getTripWithDetails(tripId: string) {
   });
 }
 
-export async function updateTrip(tripId: string, updates: any) {
+export async function updateTrip(tripId: string, updates: UpdateTripInput) {
   return await prisma.trip.update({
     where: { id: tripId },
     data: updates,
